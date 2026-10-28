@@ -8,8 +8,11 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 60
+
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
 
     steps:
       - name: Checkout Signal iOS
@@ -17,13 +20,18 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Show build environment
+      - name: Verify Xcode
         run: |
           echo "macOS:"
           sw_vers
+
           echo ""
           echo "Xcode:"
           xcodebuild -version
+
+          echo ""
+          echo "Signal requires:"
+          cat .xcode-version
 
       - name: Prepare Signal dependencies
         run: |
@@ -58,7 +66,8 @@ jobs:
           fi
 
           echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
-          echo "Signal.app found at:"
+
+          echo "Signal.app found:"
           echo "$APP_PATH"
 
           echo ""
@@ -77,6 +86,7 @@ jobs:
 
           zip -qry Signal2-unsigned.ipa Payload
 
+          echo ""
           echo "IPA created:"
           ls -lh Signal2-unsigned.ipa
 
