@@ -1,0 +1,72 @@
+name: Build Signal 2 IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Signal iOS
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Show build environment
+        run: |
+          sw_vers
+          xcodebuild -version
+
+      - name: Prepare Signal dependencies
+        run: |
+          make dependencies
+
+      - name: Build Signal 2 unsigned
+        run: |
+          xcodebuild \
+            -workspace Signal.xcworkspace \
+            -scheme Signal \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath "$PWD/build" \
+            SIGNAL_BUNDLEID_PREFIX=com.tien462.signal2 \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Find built Signal app
+        run: |
+          APP_PATH="$(find "$PWD/build/Build/Products" -type d -name "Signal.app" | head -n 1)"
+
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: Không tìm thấy Signal.app"
+            find "$PWD/build/Build/Products" -maxdepth 3 -type d -print
+            exit 1
+          fi
+
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+          echo "Found app: $APP_PATH"
+
+          /usr/libexec/PlistBuddy \
+            -c "Print :CFBundleIdentifier" \
+            "$APP_PATH/Info.plist" || true
+
+      - name: Create unsigned IPA
+        run: |
+          rm -rf Payload
+          mkdir -p Payload
+
+          ditto "$APP_PATH" "Payload/Signal.app"
+
+          zip -qry Signal2-unsigned.ipa Payload
+
+          ls -lh Signal2-unsigned.ipa
+
+      - name: Upload Signal 2 IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Signal2-unsigned
+          path: Signal2-unsigned.ipa
+          if-no-files-found: error
